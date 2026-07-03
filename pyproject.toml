@@ -6,4 +6,6 @@ requires-python = ">=3.11"
 dependencies = [
     "pydantic-settings",
     "python-dotenv",
+    "praw",
+    "tenacity",
 ]
