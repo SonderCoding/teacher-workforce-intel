@@ -16,9 +16,6 @@ def main():
         raise SystemExit(1)
 
     print("Loaded settings:")
-    print(f"REDDIT_CLIENT_ID={settings.reddit_client_id}")
-    print("REDDIT_CLIENT_SECRET=***")
-    print(f"REDDIT_USER_AGENT={settings.reddit_user_agent}")
     print(f"DATABASE_URL={settings.database_url}")
 
     logger.info("Application started.")
