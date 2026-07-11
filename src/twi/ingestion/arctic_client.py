@@ -1,4 +1,5 @@
 import time
+from datetime import datetime, timezone
 import requests
 from twi.logging_config import get_logger
 
@@ -12,7 +13,6 @@ def _get(endpoint: str, params: dict, max_retries: int = 3) -> dict:
     for attempt in range(max_retries):
         response = requests.get(url, params=params, timeout=30)
 
-        # Check rate limit headers before doing anything else
         remaining = int(response.headers.get("X-RateLimit-Remaining", 10))
         if remaining < 3:
             reset_in = float(response.headers.get("X-RateLimit-Reset", 5))
@@ -23,7 +23,7 @@ def _get(endpoint: str, params: dict, max_retries: int = 3) -> dict:
             return response.json()
 
         if response.status_code == 429:
-            wait = 2 ** attempt * 5  # exponential backoff: 5s, 10s, 20s
+            wait = 2 ** attempt * 5
             log.warning("429 rate limited, retrying in %ds (attempt %d)", wait, attempt + 1)
             time.sleep(wait)
             continue
@@ -39,6 +39,10 @@ def _get(endpoint: str, params: dict, max_retries: int = 3) -> dict:
     raise RuntimeError(f"Arctic Shift request failed after {max_retries} retries: {url}")
 
 
+def _to_timestamp(date_str: str) -> int:
+    return int(datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
+
+
 def search_posts(
     subreddit: str,
     after: str,
@@ -46,34 +50,12 @@ def search_posts(
     limit: int = 100,
     sort: str = "asc",
 ) -> list[dict]:
-    """
-    Returns raw dicts from the Arctic Shift API.
-    'after' and 'before' are ISO date strings, e.g. "2024-01-01".
-    'limit' is capped at 100 per request by the API.
-    """
     params = {
         "subreddit": subreddit,
-        "after": after,
-        "before": before,
+        "after": _to_timestamp(after),
+        "before": _to_timestamp(before),
         "limit": min(limit, 100),
         "sort": sort,
         "sort_type": "created_utc",
     }
-    data = _get("/posts/search", params)
-    return data.get("data", [])
-
-
-def search_comments(
-    subreddit: str,
-    after: str,
-    before: str,
-    limit: int = 100,
-) -> list[dict]:
-    params = {
-        "subreddit": subreddit,
-        "after": after,
-        "before": before,
-        "limit": min(limit, 100),
-    }
-    data = _get("/comments/search", params)
-    return data.get("data", [])
+    return _get("/posts/search", params).get("data", [])

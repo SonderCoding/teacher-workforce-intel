@@ -50,7 +50,8 @@ def fetch_subreddit_posts(
                 all_posts.append(post)
 
         last_ts = raw_items[-1]["created_utc"]
-        current_after = str(int(last_ts) + 1)
+        last_dt = datetime.fromtimestamp(int(last_ts), tz=timezone.utc)
+        current_after = last_dt.strftime("%Y-%m-%d")
 
         if len(raw_items) < 100:
             break
