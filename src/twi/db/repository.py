@@ -1,4 +1,4 @@
-import psycopg2
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from twi.db.base import engine
 from twi.db.models import Subreddit
@@ -31,17 +31,26 @@ def upsert_posts(session: Session, posts: list[RedditPost]) -> int:
         p.created_utc,
     ) for p in posts]
 
-    with engine.connect() as conn:
-        raw = conn.connection
-        with raw.cursor() as cur:
-            for i in range(0, len(rows), 500):
-                batch = rows[i:i + 500]
-                cur.executemany("""
-                    INSERT INTO posts (reddit_id, subreddit_id, title, body, author, score, num_comments, created_utc)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (reddit_id)
-                    DO UPDATE SET score = EXCLUDED.score, num_comments = EXCLUDED.num_comments
-                """, batch)
-            raw.commit()
+    with engine.begin() as conn:
+        for i in range(0, len(rows), 500):
+            batch = rows[i:i + 500]
+            conn.execute(text("""
+                INSERT INTO posts (reddit_id, subreddit_id, title, body, author, score, num_comments, created_utc)
+                VALUES (:reddit_id, :subreddit_id, :title, :body, :author, :score, :num_comments, :created_utc)
+                ON CONFLICT (reddit_id)
+                DO UPDATE SET score = EXCLUDED.score, num_comments = EXCLUDED.num_comments
+            """), [
+                {
+                    "reddit_id": r[0],
+                    "subreddit_id": r[1],
+                    "title": r[2],
+                    "body": r[3],
+                    "author": r[4],
+                    "score": r[5],
+                    "num_comments": r[6],
+                    "created_utc": r[7],
+                }
+                for r in batch
+            ])
 
     return len(rows)

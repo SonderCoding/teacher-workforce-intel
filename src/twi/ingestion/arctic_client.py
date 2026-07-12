@@ -39,13 +39,15 @@ def _get(endpoint: str, params: dict, max_retries: int = 3) -> dict:
     raise RuntimeError(f"Arctic Shift request failed after {max_retries} retries: {url}")
 
 
-def _to_timestamp(date_str: str) -> int:
-    return int(datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
+def _to_timestamp(value) -> int:
+    if isinstance(value, int):
+        return value
+    return int(datetime.strptime(value, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
 
 
 def search_posts(
     subreddit: str,
-    after: str,
+    after,
     before: str,
     limit: int = 100,
     sort: str = "asc",

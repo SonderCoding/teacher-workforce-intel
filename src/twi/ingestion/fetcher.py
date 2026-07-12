@@ -36,10 +36,22 @@ def fetch_subreddit_posts(
 ) -> list[RedditPost]:
     all_posts: list[RedditPost] = []
     current_after = after
+    consecutive_errors = 0
 
     while len(all_posts) < limit:
         batch_size = min(100, limit - len(all_posts))
-        raw_items = search_posts(subreddit, current_after, before, limit=batch_size)
+        try:
+            raw_items = search_posts(subreddit, current_after, before, limit=batch_size)
+            consecutive_errors = 0
+        except Exception as exc:
+            consecutive_errors += 1
+            if consecutive_errors >= 3:
+                log.error("3 consecutive failures at %s, stopping: %s", current_after, exc)
+                break
+            log.warning("Request failed, retrying in 10s: %s", exc)
+            import time
+            time.sleep(10)
+            continue
 
         if not raw_items:
             break
@@ -49,9 +61,7 @@ def fetch_subreddit_posts(
             if post:
                 all_posts.append(post)
 
-        last_ts = raw_items[-1]["created_utc"]
-        last_dt = datetime.fromtimestamp(int(last_ts), tz=timezone.utc)
-        current_after = last_dt.strftime("%Y-%m-%d")
+        current_after = int(raw_items[-1]["created_utc"]) + 1
 
         if len(raw_items) < 100:
             break
